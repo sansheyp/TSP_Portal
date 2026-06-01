@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 import requests
 import os
+import re
 import configparser
 from functools import wraps
 from datetime import datetime
@@ -186,16 +187,32 @@ def dashboard():
         "CAR": "Loose in Car"
     }
 
+    def _kit_num(prefix):
+        """Normalise a kit/bag prefix to its bare integer, e.g. 'P06' or '06' → '6'."""
+        nums = re.findall(r'\d+', prefix)
+        return str(int(nums[-1])) if nums else prefix
+
     my_kits = []
     for kit in my_kits_raw:
         kit_prefix = kit.get("asset_tag", "").replace("KIT-", "")
+
+        # Primary match: prefix is a substring of the bag tag (e.g. "P06" in "BAG-P06-CAM")
         kit_bags = [b for b in my_bags if kit_prefix in b.get("asset_tag", "")]
+
+        # Fallback: normalise both sides to bare integers so "P06", "06", and "6" all match
+        if not kit_bags:
+            kit_num = _kit_num(kit_prefix)
+            kit_bags = [
+                b for b in my_bags
+                if _kit_num(b.get("asset_tag", "").replace("BAG-", "").split("-")[0]) == kit_num
+            ]
+
         bag_objects = []
         for bag in sorted(kit_bags, key=lambda x: x.get("asset_tag", "")):
-            tag = bag.get("asset_tag", "")
-            name = bag.get("name") or tag
-            if not name or name == tag:
-                name = name_map.get(tag.split("-")[-1], tag)
+            tag    = bag.get("asset_tag", "")
+            suffix = tag.split("-")[-1]
+            # Prefer the clean name_map label; fall back to Snipe-IT name then raw tag
+            name   = name_map.get(suffix) or bag.get("name") or tag
             bag_objects.append({"id": bag["id"], "name": name, "tag": tag})
 
         kit["bag_objects"] = bag_objects
