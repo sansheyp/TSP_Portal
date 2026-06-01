@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block topbar %}
+<div class="topbar">
+  <div style="display: flex; align-items: center; gap: 8px;">
+    <a href="{{ '/kit/' + kit_tag if kit_tag else '/dashboard' }}" class="topbar-back">←</a>
+    <div>
+      <div class="topbar-title">Equipment Repair Form</div>
+      <div class="topbar-sub">The School Photographer</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block content %}
+<div style="margin-top: 16px;">
+  <form method="POST">
+    <input type="hidden" name="asset_id" value="{{ asset_id }}">
+    <input type="hidden" name="kit_tag" value="{{ kit_tag }}">
+
+    <div class="card">
+      <div class="card-title">Item details</div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="form-group">
+          <label class="form-label">Kit #</label>
+          <input class="form-input" type="text" value="{{ kit_tag }}" readonly>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Date</label>
+          <input class="form-input" type="date" name="date" value="{{ today }}" readonly>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="form-group">
+          <label class="form-label">Make</label>
+          <input class="form-input" type="text" name="make" value="{{ make }}" placeholder="e.g. Canon">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Model</label>
+          <input class="form-input" type="text" name="model" value="{{ model }}" placeholder="e.g. 800D">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Serial number</label>
+        <input class="form-input" type="text" name="serial" value="{{ serial }}" placeholder="Serial number">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Description of problem</label>
+        <textarea class="form-textarea" name="description" placeholder="Describe the fault in detail — what happened, when it started, what were you doing when it occurred..." required style="min-height: 130px;"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Replacement required?</label>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <label style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1.5px solid #E5E9EF; border-radius: 10px; cursor: pointer; transition: all 0.15s;" id="label-yes">
+            <input type="radio" name="replacement_required" value="Yes" onchange="styleRadio()"> 
+            <span style="font-size: 14px; font-weight: 500;">Yes</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1.5px solid #1F4E79; background: #EBF3FB; border-radius: 10px; cursor: pointer; transition: all 0.15s;" id="label-no">
+            <input type="radio" name="replacement_required" value="No" checked onchange="styleRadio()"> 
+            <span style="font-size: 14px; font-weight: 500;">No</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 0;">
+        <label class="form-label">Photographer</label>
+        <input class="form-input" type="text" value="{{ user_name }}" readonly>
+      </div>
+    </div>
+
+    <div class="info-box">
+      ⚡ Your report will be logged immediately and the operations team will be notified.
+    </div>
+
+    <button class="btn btn-danger" type="submit" style="font-size: 16px; padding: 16px;">Submit fault report</button>
+    <a href="{{ '/kit/' + kit_tag if kit_tag else '/dashboard' }}" class="btn btn-ghost">Cancel</a>
+  </form>
+</div>
+<script>
+function styleRadio() {
+  const yesChecked = document.querySelector('input[value="Yes"]').checked;
+  document.getElementById('label-yes').style.cssText = yesChecked ? 
+    'display:flex;align-items:center;gap:10px;padding:12px 14px;border:1.5px solid #1F4E79;background:#EBF3FB;border-radius:10px;cursor:pointer;transition:all 0.15s;' :
+    'display:flex;align-items:center;gap:10px;padding:12px 14px;border:1.5px solid #E5E9EF;border-radius:10px;cursor:pointer;transition:all 0.15s;';
+  document.getElementById('label-no').style.cssText = !yesChecked ? 
+    'display:flex;align-items:center;gap:10px;padding:12px 14px;border:1.5px solid #1F4E79;background:#EBF3FB;border-radius:10px;cursor:pointer;transition:all 0.15s;' :
+    'display:flex;align-items:center;gap:10px;padding:12px 14px;border:1.5px solid #E5E9EF;border-radius:10px;cursor:pointer;transition:all 0.15s;';
+}
+</script>
+{% endblock %}

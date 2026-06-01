@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block topbar %}
+<div class="topbar">
+  <div style="display: flex; align-items: center; gap: 8px;">
+    <a href="/dashboard" class="topbar-back">←</a>
+    <div>
+      <div class="topbar-title">{{ kit.name or kit_tag }}</div>
+      <div class="topbar-sub">{% if is_mine %}Assigned to you{% else %}Available to check out{% endif %}</div>
+    </div>
+  </div>
+  {% if is_mine %}
+  <a href="/fault?kit_tag={{ kit_tag }}" style="color: #FFD966; font-size: 12px; font-weight: 700;">⚠ FAULT</a>
+  {% endif %}
+</div>
+{% endblock %}
+{% block content %}
+
+{% if not is_mine %}
+<div class="card" style="margin-top: 16px;">
+  <div class="card-title">Select bags to check out</div>
+
+  <div class="check-item" id="check-all-item" onclick="toggleSelectAll()">
+    <div class="check-item-check" id="check-all-box"></div>
+    <div style="flex: 1;">
+      <div style="font-size: 15px; font-weight: 700; color: #1F4E79;">Entire kit — all bags</div>
+      <div style="font-size: 12px; color: #888; margin-top: 2px;">{{ bags|length }} bags · all contents</div>
+    </div>
+    <span style="font-size: 18px;">📦</span>
+  </div>
+
+  <div class="divider">or choose individual bags</div>
+
+  {% for bag in bags %}
+  <div class="check-item" id="check-bag-{{ bag.id }}" onclick="toggleBagCheck('{{ bag.id }}')">
+    <div class="check-item-check" id="check-box-{{ bag.id }}"></div>
+    <div style="flex: 1;">
+      <div style="font-size: 14px; font-weight: 600; color: #1a1a2e;">{{ bag.name }}</div>
+      <div style="font-size: 12px; color: #999; margin-top: 1px;">{{ bag.assets|length }} item{% if bag.assets|length != 1 %}s{% endif %}</div>
+    </div>
+  </div>
+  {% endfor %}
+
+  <div style="margin-top: 16px;">
+    <button class="btn btn-primary" id="checkout-btn" onclick="doCheckoutSelected({{ kit.id }}, '{{ kit_tag }}')" disabled>
+      Select bags above
+    </button>
+  </div>
+</div>
+
+{% else %}
+<div style="margin-top: 16px; margin-bottom: 4px;">
+  <button class="btn btn-danger" onclick="doCheckin({{ kit.id }}, '{{ kit_tag }}')">
+    ✓ Check in entire kit
+  </button>
+</div>
+{% endif %}
+
+<div class="section-label">Kit contents</div>
+
+{% for bag in bags %}
+<div class="bag-section">
+  <div class="bag-header" onclick="toggleBag('{{ loop.index }}')">
+    <div class="bag-header-left">
+      <div class="bag-icon">📦</div>
+      <div>
+        <div class="bag-title">{{ bag.name }}</div>
+        <div class="bag-count">{{ bag.assets|length }} item{% if bag.assets|length != 1 %}s{% endif %}</div>
+      </div>
+    </div>
+    <span class="bag-arrow" id="bag-arrow-{{ loop.index }}">▶</span>
+  </div>
+  <div class="bag-contents" id="bag-contents-{{ loop.index }}">
+    {% if bag.assets %}
+      {% for asset in bag.assets %}
+      {% set model_name = asset.model.name if asset.model else '' %}
+      {% set make_name = asset.manufacturer.name if asset.manufacturer else '' %}
+      <div class="asset-row">
+        <div class="asset-icon">
+          {% if 'CAM' in asset.asset_tag or 'LENS' in asset.asset_tag %}📷
+          {% elif 'LIGHT' in asset.asset_tag %}💡
+          {% elif 'LAP' in asset.asset_tag %}💻
+          {% elif 'EXT' in asset.asset_tag or 'PWR' in asset.asset_tag or 'LPC' in asset.asset_tag %}🔌
+          {% else %}🔧{% endif %}
+        </div>
+        <div style="flex: 1;">
+          <div class="asset-name">{{ asset.name or model_name or asset.asset_tag }}</div>
+          <div class="asset-tag">{{ asset.asset_tag }}{% if asset.serial %} · {{ asset.serial }}{% endif %}</div>
+        </div>
+        {% if is_mine %}
+        <a href="/fault?asset_id={{ asset.id }}&asset_tag={{ asset.asset_tag }}&kit_tag={{ kit_tag }}&asset_name={{ (asset.name or model_name or asset.asset_tag)|urlencode }}&make={{ make_name|urlencode }}&model={{ model_name|urlencode }}&serial={{ asset.serial or '' }}"
+          class="fault-btn">⚠ Fault</a>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+      <p style="font-size: 13px; color: #bbb; text-align: center; padding: 12px 0;">No items listed</p>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+
+<script>
+const bagIds = [{% for bag in bags %}'{{ bag.id }}'{% if not loop.last %},{% endif %}{% endfor %}];
+let selectedBags = new Set();
+let allSelected = false;
+
+function toggleSelectAll() {
+  allSelected = !allSelected;
+  const box = document.getElementById('check-all-box');
+  const item = document.getElementById('check-all-item');
+  box.classList.toggle('selected', allSelected);
+  item.classList.toggle('selected', allSelected);
+  if (allSelected) {
+    box.innerHTML = '✓';
+    box.style.cssText = 'width:22px;height:22px;border-radius:6px;border:2px solid #1F4E79;background:#1F4E79;display:flex;align-items:center;justify-content:center;color:white;font-size:14px;font-weight:700;';
+  } else {
+    box.innerHTML = '';
+    box.style.cssText = 'width:22px;height:22px;border-radius:6px;border:2px solid #CBD5E0;display:flex;align-items:center;justify-content:center;';
+  }
+  bagIds.forEach(id => {
+    selectedBags[allSelected ? 'add' : 'delete'](id);
+    const bagBox = document.getElementById('check-box-' + id);
+    const bagItem = document.getElementById('check-bag-' + id);
+    bagItem.classList.toggle('selected', allSelected);
+    if (allSelected) {
+      bagBox.innerHTML = '✓';
+      bagBox.style.cssText = 'width:22px;height:22px;border-radius:6px;border:2px solid #1F4E79;background:#1F4E79;display:flex;align-items:center;justify-content:center;color:white;font-size:14px;font-weight:700;';
+    } else {
+      bagBox.innerHTML = '';
+      bagBox.style.cssText = 'width:22px;height:22px;border-radius:6px;border:2px solid #CBD5E0;display:flex;align-items:center;justify-content:center;';
+    }
+  });
+  updateBtn();
+}
+
+function toggleBagCheck(id) {
+  if (selectedBags.has(id)) {
+    selectedBags.delete(id);
+  } else {
+    selectedBags.add(id);
+  }
+  const isSelected = selectedBags.has(id);
+  const box = document.getElementById('check-box-' + id);
+  const item = document.getElementById('check-bag-' + id);
+  item.classList.toggle('selected', isSelected);
+  if (isSelected) {
+    box.innerHTML = '✓';
+    box.style.cssText = 'width:22px;height:22px;border-radius:6px;border:2px solid #1F4E79;background:#1F4E79;display:flex;align-items:center;justify-content:center;color:white;font-size:14px;font-weight:700;';
+  } else {
+    box.innerHTML = '';
+    box.style.cssText = 'width:22px;height:22px;border-radius:6px;border:2px solid #CBD5E0;display:flex;align-items:center;justify-content:center;';
+  }
+  allSelected = selectedBags.size === bagIds.length;
+  updateBtn();
+}
+
+function updateBtn() {
+  const btn = document.getElementById('checkout-btn');
+  const count = allSelected ? bagIds.length : selectedBags.size;
+  btn.disabled = count === 0;
+  if (count === 0) btn.textContent = 'Select bags above';
+  else if (allSelected || count === bagIds.length) btn.textContent = '✓ Check out entire kit';
+  else if (count === 1) btn.textContent = '✓ Check out 1 bag';
+  else btn.textContent = `✓ Check out ${count} bags`;
+}
+
+async function doCheckoutSelected(kitId, kitTag) {
+  const isFullKit = allSelected || selectedBags.size === bagIds.length;
+  const count = isFullKit ? bagIds.length : selectedBags.size;
+  if (!confirm(`Check out ${isFullKit ? 'entire kit' : count + ' bag(s)'} from ${kitTag}?`)) return;
+
+  if (isFullKit) {
+    showLoading("Checking out " + kitTag + "...");
+    try {
+      const r = await fetch("/checkout/" + kitId, { method: "POST" });
+      const d = await r.json();
+      hideLoading();
+      alert("✓ " + kitTag + " checked out!\n" + d.done + " items assigned to you.");
+      window.location.href = "/dashboard";
+    } catch(e) { hideLoading(); alert("Something went wrong."); }
+  } else {
+    showLoading("Checking out selected bags...");
+    let done = 0;
+    for (const bagId of selectedBags) {
+      try {
+        const r = await fetch("/checkout-bag/" + bagId, { method: "POST" });
+        const d = await r.json();
+        done += d.done || 0;
+      } catch(e) {}
+    }
+    hideLoading();
+    alert("✓ " + selectedBags.size + " bag(s) checked out!");
+    window.location.href = "/dashboard";
+  }
+}
+
+async function doCheckin(kitId, kitTag) {
+  if (!confirm("Check in " + kitTag + "?\n\nAll items will be returned to available.")) return;
+  showLoading("Checking in " + kitTag + "...");
+  try {
+    const r = await fetch("/checkin/" + kitId, { method: "POST" });
+    const d = await r.json();
+    hideLoading();
+    alert("✓ " + kitTag + " checked in!");
+    window.location.href = "/dashboard";
+  } catch(e) { hideLoading(); alert("Something went wrong."); }
+}
+</script>
+{% endblock %}

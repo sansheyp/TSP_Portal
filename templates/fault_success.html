@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block topbar %}
+<div class="topbar">
+  <div class="topbar-title">Fault Reported</div>
+</div>
+{% endblock %}
+{% block content %}
+<div style="text-align: center; padding: 60px 20px 40px;">
+  <div style="width: 80px; height: 80px; background: #E8F8F0; border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 36px;">✅</div>
+  <h2 style="font-size: 22px; font-weight: 800; color: #1a1a2e; margin-bottom: 10px;">Report submitted</h2>
+  <p style="font-size: 15px; color: #666; margin-bottom: 8px; line-height: 1.6;">Your fault report has been logged and the operations team has been notified.</p>
+
+  <div class="card" style="text-align: left; margin: 24px 0;">
+    <div class="card-title">Operations contacts</div>
+    <div class="list-item">
+      <div class="list-item-icon">👤</div>
+      <div>
+        <div class="list-item-name">Josh Rodgers-Falk</div>
+        <div class="list-item-sub">VIC Operations · 0420 792 775</div>
+      </div>
+    </div>
+    <div class="list-item">
+      <div class="list-item-icon">👤</div>
+      <div>
+        <div class="list-item-name">Marcus Ferraro</div>
+        <div class="list-item-sub">VIC Branch Manager · 0456 884 250</div>
+      </div>
+    </div>
+  </div>
+
+  {% if kit_tag %}
+  <a href="/kit/{{ kit_tag }}" class="btn btn-ghost" style="margin-bottom: 8px;">Back to kit</a>
+  {% endif %}
+  <a href="/dashboard" class="btn btn-primary">Back to dashboard</a>
+</div>
+{% endblock %}
