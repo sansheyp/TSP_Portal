@@ -388,6 +388,25 @@ def fault_report():
         f_photog     = session["user_name"]
         f_date       = datetime.now().strftime("%Y-%m-%d")
 
+        # If no specific asset was selected, fall back to the kit asset itself
+        if not f_asset_id and f_kit:
+            try:
+                kit_asset = snipe_get(f"/hardware/bytag/{f_kit}")
+                if kit_asset and kit_asset.get("status") != "error":
+                    f_asset_id = str(kit_asset["id"])
+            except Exception:
+                pass
+
+        if not f_desc:
+            return render_template("fault.html",
+                user_name=session["user_name"],
+                error="Please describe the problem before submitting.",
+                asset_id=f_asset_id, asset_tag=request.form.get("asset_tag",""),
+                kit_tag=f_kit, asset_name=request.form.get("asset_name",""),
+                make=f_make, model=f_model, serial=f_serial,
+                today=f_date,
+            )
+
         if f_asset_id and f_desc:
             try:
                 title = f"Fault: {f_make} {f_model} ({f_kit}) — reported by {f_photog}"
@@ -425,6 +444,14 @@ def fault_report():
             except Exception as e:
                 print(f"Fault report error: {e}")
                 import traceback; traceback.print_exc()
+                return render_template("fault.html",
+                    user_name=session["user_name"],
+                    error="Something went wrong submitting the report. Please try again.",
+                    asset_id=f_asset_id, asset_tag=request.form.get("asset_tag",""),
+                    kit_tag=f_kit, asset_name=request.form.get("asset_name",""),
+                    make=f_make, model=f_model, serial=f_serial,
+                    today=f_date,
+                )
 
     return render_template("fault.html",
         user_name=session["user_name"],

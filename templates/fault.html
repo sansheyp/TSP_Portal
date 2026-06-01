@@ -12,6 +12,11 @@
 {% endblock %}
 {% block content %}
 <div style="margin-top: 16px;">
+  {% if error %}
+  <div style="background: var(--c-danger-soft); color: var(--c-danger); border: 1px solid var(--c-danger-border); border-radius: 12px; padding: 13px 16px; margin-bottom: 14px; font-size: 14px; font-weight: 600;">
+    ⚠ {{ error }}
+  </div>
+  {% endif %}
   <form method="POST">
     <input type="hidden" name="asset_id" value="{{ asset_id }}">
     <input type="hidden" name="kit_tag" value="{{ kit_tag }}">
