@@ -179,29 +179,27 @@ def dashboard():
     # For each kit, find which bags are assigned to this user
     my_bags = [a for a in assets if a.get("asset_tag", "").startswith("BAG-")]
 
+    name_map = {
+        "CAM": "Camera Bag", "LGT1": "Light Bag 1", "LGT2": "Light Bag 2",
+        "STD": "Stand Bag", "TOTE": "Tote Bag", "TBL": "Table",
+        "BDT": "Backdrop Tube", "WBD": "White Backdrop Bag",
+        "CAR": "Loose in Car"
+    }
+
     my_kits = []
     for kit in my_kits_raw:
         kit_prefix = kit.get("asset_tag", "").replace("KIT-", "")
-        # Find bags from this kit assigned to user
         kit_bags = [b for b in my_bags if kit_prefix in b.get("asset_tag", "")]
-        bag_names = []
+        bag_objects = []
         for bag in sorted(kit_bags, key=lambda x: x.get("asset_tag", "")):
-            name = bag.get("name") or bag.get("asset_tag", "")
-            # Clean up name — remove tag prefix for readability
-            if not name or name == bag.get("asset_tag"):
-                tag = bag.get("asset_tag", "")
-                suffix = tag.split("-")[-1]
-                name_map = {
-                    "CAM": "Camera Bag", "LGT1": "Light Bag 1", "LGT2": "Light Bag 2",
-                    "STD": "Stand Bag", "TOTE": "Tote Bag", "TBL": "Table",
-                    "BDT": "Backdrop Tube", "WBD": "White Backdrop Bag",
-                    "CAR": "Loose in Car"
-                }
-                name = name_map.get(suffix, suffix)
-            bag_names.append(name)
+            tag = bag.get("asset_tag", "")
+            name = bag.get("name") or tag
+            if not name or name == tag:
+                name = name_map.get(tag.split("-")[-1], tag)
+            bag_objects.append({"id": bag["id"], "name": name, "tag": tag})
 
-        kit["checked_out_bags"] = bag_names
-        kit["full_kit"] = len(kit_bags) >= 9  # 9 bags = full portrait kit
+        kit["bag_objects"] = bag_objects
+        kit["full_kit"] = len(kit_bags) >= 9
         my_kits.append(kit)
 
     available_kits = get_available_kits()
@@ -305,6 +303,67 @@ def checkin_kit_route(kit_id):
     if checkin_asset(kit_id, note): done += 1
     else: failed += 1
     return jsonify({"status": "success", "done": done, "failed": failed})
+
+@app.route("/checkin-bag/<int:bag_id>", methods=["POST"])
+@login_required
+def checkin_bag_route(bag_id):
+    note    = f"Checked in via TSP Portal {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+    user_id = session["user_id"]
+    done = 0; failed = 0
+
+    bag     = snipe_get(f"/hardware/{bag_id}")
+    bag_tag = bag.get("asset_tag", "")
+
+    all_assets = snipe_get("/hardware", {"limit": 500}).get("rows", [])
+
+    if bag_tag.startswith("BAG-"):
+        kit_prefix = bag_tag.replace("BAG-", "").rsplit("-", 1)[0]
+        bag_suffix = bag_tag.split("-")[-1]
+
+        # Check in L3 assets belonging to this bag that are assigned to this user
+        for asset in all_assets:
+            tag      = asset.get("asset_tag", "")
+            assigned = asset.get("assigned_to", {})
+            if not (isinstance(assigned, dict) and assigned.get("id") == user_id):
+                continue
+            if tag.startswith("BAG-") or tag.startswith("KIT-") or kit_prefix not in tag:
+                continue
+            matched = False
+            if bag_suffix == "CAM" and any(x in tag for x in ["CAM-", "LENS-", "LAP-", "SCNR-", "TIMESTN-", "BAT-"]):
+                matched = True
+            elif bag_suffix == "LGT1" and any(x in tag for x in ["LIGHT-", "LPC-", "EXT-", "PWR-"]) and tag.endswith("-1"):
+                matched = True
+            elif bag_suffix == "LGT2" and any(x in tag for x in ["LIGHT-", "LPC-", "EXT-", "PWR-"]) and tag.endswith("-2"):
+                matched = True
+            elif bag_suffix not in ["CAM", "LGT1", "LGT2"] and bag_suffix.lower() in tag.lower():
+                matched = True
+            if matched:
+                if checkin_asset(asset["id"], note): done += 1
+                else: failed += 1
+
+        # Determine if any other bags from this kit remain with this user
+        remaining_bags = [
+            a for a in all_assets
+            if a.get("asset_tag", "").startswith(f"BAG-{kit_prefix}-")
+            and isinstance(a.get("assigned_to"), dict)
+            and a["assigned_to"].get("id") == user_id
+            and a["id"] != bag_id
+        ]
+
+    # Check in the bag itself
+    if checkin_asset(bag_id, note): done += 1
+    else: failed += 1
+
+    # If no other bags remain, also check in the parent kit
+    if bag_tag.startswith("BAG-") and not remaining_bags:
+        kit = snipe_get(f"/hardware/bytag/KIT-{kit_prefix}")
+        if kit and kit.get("status") != "error":
+            assigned = kit.get("assigned_to", {})
+            if isinstance(assigned, dict) and assigned.get("id") == user_id:
+                if checkin_asset(kit["id"], note): done += 1
+
+    return jsonify({"status": "success", "done": done, "failed": failed})
+
 
 @app.route("/fault", methods=["GET", "POST"])
 @login_required

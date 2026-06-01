@@ -23,33 +23,75 @@
 <div id="panel-my" {% if not my_kits %}style="display:none"{% endif %}>
   {% if my_kits %}
     {% for kit in my_kits %}
-    <div class="kit-card">
-      <div class="kit-card-header">
-        <div>
-          <div class="kit-card-title">{{ kit.name or kit.asset_tag }}</div>
-          <div class="kit-card-sub">{{ kit.asset_tag }}</div>
+      {% if kit.full_kit %}
+      <div class="kit-card">
+        <div class="kit-card-header">
+          <div>
+            <div class="kit-card-title">{{ kit.name or kit.asset_tag }}</div>
+            <div class="kit-card-sub">{{ kit.asset_tag }}</div>
+          </div>
+          <span class="badge badge-green">Full kit</span>
         </div>
-        <span class="badge {% if kit.full_kit %}badge-green{% else %}badge-orange{% endif %}">
-          {% if kit.full_kit %}Full kit{% else %}Partial{% endif %}
-        </span>
+        {% if kit.bag_objects %}
+        <div class="bag-pills">
+          {% for bag in kit.bag_objects %}
+          <span class="bag-pill">📦 {{ bag.name }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <a href="/kit/{{ kit.asset_tag }}" class="btn btn-ghost" style="margin-bottom: 8px;">
+          📋 View kit contents
+        </a>
+        <a href="/fault?kit_tag={{ kit.asset_tag }}" class="btn btn-outline-red" style="margin-bottom: 8px;">
+          ⚠️ Report a fault
+        </a>
+        <button class="btn btn-danger" onclick="doCheckin({{ kit.id }}, '{{ kit.asset_tag }}')">
+          ✓ Check in this kit
+        </button>
       </div>
-      {% if kit.checked_out_bags %}
-      <div class="bag-pills">
-        {% for bag in kit.checked_out_bags %}
-        <span class="bag-pill">📦 {{ bag }}</span>
-        {% endfor %}
-      </div>
+      {% else %}
+        {% if kit.bag_objects %}
+          {% for bag in kit.bag_objects %}
+          <div class="kit-card">
+            <div class="kit-card-header">
+              <div>
+                <div class="kit-card-title">{{ bag.name }}</div>
+                <div class="kit-card-sub">from {{ kit.asset_tag }}</div>
+              </div>
+              <span class="badge badge-orange">Partial</span>
+            </div>
+            <a href="/kit/{{ kit.asset_tag }}" class="btn btn-ghost" style="margin-bottom: 8px;">
+              📋 View kit contents
+            </a>
+            <a href="/fault?kit_tag={{ kit.asset_tag }}" class="btn btn-outline-red" style="margin-bottom: 8px;">
+              ⚠️ Report a fault
+            </a>
+            <button class="btn btn-danger" onclick="doCheckinBag({{ bag.id }}, '{{ bag.name }}', '{{ kit.asset_tag }}')">
+              ✓ Check in this bag
+            </button>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="kit-card">
+            <div class="kit-card-header">
+              <div>
+                <div class="kit-card-title">{{ kit.name or kit.asset_tag }}</div>
+                <div class="kit-card-sub">{{ kit.asset_tag }}</div>
+              </div>
+              <span class="badge badge-orange">Checked out</span>
+            </div>
+            <a href="/kit/{{ kit.asset_tag }}" class="btn btn-ghost" style="margin-bottom: 8px;">
+              📋 View kit contents
+            </a>
+            <a href="/fault?kit_tag={{ kit.asset_tag }}" class="btn btn-outline-red" style="margin-bottom: 8px;">
+              ⚠️ Report a fault
+            </a>
+            <button class="btn btn-danger" onclick="doCheckin({{ kit.id }}, '{{ kit.asset_tag }}')">
+              ✓ Check in this kit
+            </button>
+          </div>
+        {% endif %}
       {% endif %}
-      <a href="/kit/{{ kit.asset_tag }}" class="btn btn-ghost" style="margin-bottom: 8px;">
-        📋 View kit contents
-      </a>
-      <a href="/fault?kit_tag={{ kit.asset_tag }}" class="btn btn-outline-red" style="margin-bottom: 8px;">
-        ⚠️ Report a fault
-      </a>
-      <button class="btn btn-danger" onclick="doCheckin({{ kit.id }}, '{{ kit.asset_tag }}')">
-        ✓ Check in this kit
-      </button>
-    </div>
     {% endfor %}
   {% else %}
     <div class="empty-state">
@@ -72,10 +114,10 @@
         </div>
         <span class="badge badge-blue">Available</span>
       </div>
-      <a href="/kit/{{ kit.asset_tag }}" class="btn btn-ghost" style="margin-bottom: 8px;">
+      <a href="/kit/{{ kit.asset_tag }}" class="btn btn-accent" style="margin-bottom: 8px;">
         🔍 Preview &amp; select bags
       </a>
-      <button class="btn btn-primary" onclick="doCheckout({{ kit.id }}, '{{ kit.asset_tag }}')">
+      <button class="btn btn-ghost" onclick="doCheckout({{ kit.id }}, '{{ kit.asset_tag }}')">
         ✓ Check out entire kit
       </button>
     </div>
@@ -99,27 +141,54 @@ function showTab(tab) {
 }
 
 async function doCheckout(kitId, kitTag) {
-  if (!confirm("Check out entire " + kitTag + "?\n\nAll bags and contents will be assigned to you.")) return;
-  showLoading("Checking out " + kitTag + "...");
+  const ok = await ConfirmSheet.show(
+    'Check out ' + kitTag + '?',
+    'All bags and contents will be assigned to you.',
+    '✓ Check out entire kit'
+  );
+  if (!ok) return;
+  showLoading('Checking out ' + kitTag + '...');
   try {
-    const r = await fetch("/checkout/" + kitId, { method: "POST" });
+    const r = await fetch('/checkout/' + kitId, { method: 'POST' });
     const d = await r.json();
     hideLoading();
-    alert("✓ " + kitTag + " checked out!\n" + d.done + " items assigned to you.");
-    window.location.reload();
-  } catch(e) { hideLoading(); alert("Something went wrong. Please try again."); }
+    Toast.success('✓ ' + kitTag + ' checked out — ' + d.done + ' items assigned to you.');
+    setTimeout(() => window.location.reload(), 1400);
+  } catch(e) { hideLoading(); Toast.error('Something went wrong checking out ' + kitTag + '. Please try again.'); }
 }
 
 async function doCheckin(kitId, kitTag) {
-  if (!confirm("Check in " + kitTag + "?\n\nMake sure all items are accounted for before checking in.")) return;
-  showLoading("Checking in " + kitTag + "...");
+  const ok = await ConfirmSheet.show(
+    'Check in ' + kitTag + '?',
+    'Make sure all items are accounted for before checking in.',
+    '✓ Check in entire kit'
+  );
+  if (!ok) return;
+  showLoading('Checking in ' + kitTag + '...');
   try {
-    const r = await fetch("/checkin/" + kitId, { method: "POST" });
+    const r = await fetch('/checkin/' + kitId, { method: 'POST' });
     const d = await r.json();
     hideLoading();
-    alert("✓ " + kitTag + " checked in successfully!");
-    window.location.reload();
-  } catch(e) { hideLoading(); alert("Something went wrong."); }
+    Toast.success('✓ ' + kitTag + ' checked in successfully!');
+    setTimeout(() => window.location.reload(), 1400);
+  } catch(e) { hideLoading(); Toast.error('Something went wrong checking in ' + kitTag + '. Please try again.'); }
+}
+
+async function doCheckinBag(bagId, bagName, kitTag) {
+  const ok = await ConfirmSheet.show(
+    'Check in ' + bagName + '?',
+    'All items in this bag from ' + kitTag + ' will be returned.',
+    '✓ Check in this bag'
+  );
+  if (!ok) return;
+  showLoading('Checking in ' + bagName + '...');
+  try {
+    const r = await fetch('/checkin-bag/' + bagId, { method: 'POST' });
+    const d = await r.json();
+    hideLoading();
+    Toast.success('✓ ' + bagName + ' checked in — ' + d.done + ' item(s) returned.');
+    setTimeout(() => window.location.reload(), 1400);
+  } catch(e) { hideLoading(); Toast.error('Something went wrong. Please try again.'); }
 }
 </script>
 {% endblock %}
